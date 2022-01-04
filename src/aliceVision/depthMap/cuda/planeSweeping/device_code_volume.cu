@@ -45,8 +45,8 @@ __global__ void volume_init_kernel(TSim* volume, int volume_s, int volume_p,
     *get3DBufferAt(volume, volume_s, volume_p, vx, vy, vz) = 255.0f;
 }
 
-__global__ void volume_init_kernel(TSimRefine* volume, int volume_s, int volume_p,
-                                    int volDimX, int volDimY )
+__global__ void volume_init_kernel(TSimRefine* volume, int volume_s, int volume_p, 
+                                   int volDimX, int volDimY, TSimRefine value)
 {
     const int vx = blockIdx.x * blockDim.x + threadIdx.x;
     const int vy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -55,12 +55,12 @@ __global__ void volume_init_kernel(TSimRefine* volume, int volume_s, int volume_
     if(vx >= volDimX || vy >= volDimY)
         return;
 
-    *get3DBufferAt(volume, volume_s, volume_p, vx, vy, vz) = 255.0f;
+    *get3DBufferAt(volume, volume_s, volume_p, vx, vy, vz) = value;
 }
 
-__global__ void volume_addMin_kernel(TSimRefine* out_volume, int out_volume_s, int out_volume_p,
-                                     const TSimRefine* volume, int volume_s, int volume_p,
-                                     int volDimX, int volDimY )
+__global__ void volume_add_kernel(TSimRefine* out_volume, int out_volume_s, int out_volume_p,
+                                  const TSimRefine* volume, int volume_s, int volume_p,
+                                  int volDimX, int volDimY )
 {
     const int vx = blockIdx.x * blockDim.x + threadIdx.x;
     const int vy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -70,7 +70,8 @@ __global__ void volume_addMin_kernel(TSimRefine* out_volume, int out_volume_s, i
         return;
 
     TSimRefine* outSim = get3DBufferAt(out_volume, out_volume_s, out_volume_p, vx, vy, vz);
-    *outSim = min(*outSim, *get3DBufferAt(volume, volume_s, volume_p, vx, vy, vz));
+    *outSim += *get3DBufferAt(volume, volume_s, volume_p, vx, vy, vz); 
+    // *outSim += min(*outSim, *get3DBufferAt(volume, volume_s, volume_p, vx, vy, vz));
 }
 
 __global__ void volume_initFromSimMap_kernel(TSimRefine* volume, int volume_s, int volume_p, 
@@ -251,24 +252,26 @@ __global__ void volume_refine_kernel(cudaTextureObject_t rc_tex,
     }
     else // valid similarity
     {
-        fsim = (fsim - fminVal) * fmultiplier;
+        //fsim = (fsim - fminVal) * fmultiplier;
 
 //#ifdef TSIM_USE_FLOAT
         // no clamp
 //#else
-        fsim = fminf(1.0f, fmaxf(0.0f, fsim));
+        //fsim = fminf(1.0f, fmaxf(0.0f, fsim));
 //#endif
         // convert from (0, 1) to (0, 254)
         // needed to store in the volume in uchar
         // 255 is reserved for the similarity initialization, i.e. undefined values
-        fsim *= 254.0f;
+        //fsim *= 254.0f;
     }
+
+    const float fsimInvertedFiltered = sigmoid(0.0f, 1.0f, 0.7f, -0.7f, fsim);
 
     TSimRefine* outSim = get3DBufferAt(volume_d, volume_s, volume_p, vx, vy, vz);
 
     if(fsim < *outSim)
     {
-        *outSim = TSimRefine(fsim);
+        *outSim = TSimRefine(fsimInvertedFiltered);
     }
 }
 

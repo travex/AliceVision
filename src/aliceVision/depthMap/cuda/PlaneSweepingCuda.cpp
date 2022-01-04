@@ -632,13 +632,17 @@ void PlaneSweepingCuda::refineDepthSimMapVolume(int rc,
     ps::SimilarityVolume vol(volDim, refineParams.stepXY, refineParams.scale, depths);
 
     // fill similarity volume  on device
+    /*
     {
         const int centerDepthIndex = (refineParams.nDepthsToRefine - 1) / 2;
-
         CudaHostMemoryHeap<float, 2> simMap_hmh(depthSimMapDim);
         copySim(simMap_hmh, depthSimMapSgmUpscale); // copy simMap in host memory heap
         vol.initFromSimMap(volumeRefineSim_dmp, simMap_hmh, centerDepthIndex, 0); // initialize sim(x,y,z) = simMap(x,y) at z = centerDepthIndex
         simMap_hmh.deallocate(); // deallocate simMap in host memory heap
+    }
+    */
+    {
+        vol.initOutputVolume(volumeRefineSim_dmp, TSimRefine(0.f));
     }
 
     vol.WaitSweepStream(0);
@@ -651,7 +655,7 @@ void PlaneSweepingCuda::refineDepthSimMapVolume(int rc,
         const system::Timer timerPerTc;
 
         CudaDeviceMemoryPitched<TSimRefine, 3> volumeRefineTcSim_dmp(volDim);
-        vol.initOutputVolume(volumeRefineTcSim_dmp);
+        vol.initOutputVolume(volumeRefineTcSim_dmp, TSimRefine(0.f));
 
         const int tc = tCams[i];
 
@@ -686,18 +690,20 @@ void PlaneSweepingCuda::refineDepthSimMapVolume(int rc,
                    tcam, tcWidth, tcHeight,
                    refineParams, i);
 
+        ps_volumeGaussianSmoothZ(volumeRefineTcSim_dmp, 10);
+
         if(refineParams.exportIntermediateResults)
         {
             const std::string filepathAbcPrefix = _mp.getDepthMapsFolder() + std::to_string(_mp.getViewId(rc)) + "_with_tc_" + std::to_string(_mp.getViewId(tc));
             const std::string filepathCsvPrefix = _mp.getDepthMapsFolder() + std::to_string(_mp.getViewId(rc));
             CudaHostMemoryHeap<TSimRefine, 3> volumeSim_h(volumeRefineTcSim_dmp.getSize());
             volumeSim_h.copyFrom(volumeRefineTcSim_dmp);
-            exportSimilarityVolume(volumeSim_h, depthSimMapSgmUpscale, _mp, rc, refineParams, filepathAbcPrefix + "_vol_refine.abc");
+            exportSimilarityVolumeCross(volumeSim_h, depthSimMapSgmUpscale, _mp, rc, refineParams, filepathAbcPrefix + "_volCross_refine.abc");
             exportSimilaritySamplesCSV(volumeSim_h, rc, "refine with " + std::to_string(_mp.getViewId(tc)), filepathCsvPrefix + "_9p.csv");
             volumeSim_h.deallocate();
         }
 
-        vol.addMin(volumeRefineSim_dmp, volumeRefineTcSim_dmp);
+        vol.add(volumeRefineSim_dmp, volumeRefineTcSim_dmp);
         volumeRefineTcSim_dmp.deallocate();
         
         ALICEVISION_LOG_DEBUG("Refine similarity volume (with tc: " << tc << ") done in: " << timerPerTc.elapsedMs() << " ms.");

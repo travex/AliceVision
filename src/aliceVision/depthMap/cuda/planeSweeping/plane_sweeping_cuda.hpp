@@ -45,15 +45,15 @@ public:
         CudaDeviceMemoryPitched<TSim, 3>& volSecBestSim_dmp,
         const int streamIndex );
 
-    void initOutputVolume(CudaDeviceMemoryPitched<TSimRefine, 3>& volBestSim_dmp);
+    void initOutputVolume(CudaDeviceMemoryPitched<TSimRefine, 3>& volBestSim_dmp, TSimRefine value);
 
     void initFromSimMap(CudaDeviceMemoryPitched<TSimRefine, 3>& volume_dmp, 
                         const CudaHostMemoryHeap<float, 2>& simMap_hmh, 
                         int zIndex,
                         int streamIndex);
 
-    void addMin(CudaDeviceMemoryPitched<TSimRefine, 3>& out_volume_dmp,
-                const CudaDeviceMemoryPitched<TSimRefine, 3>& volume_dmp);
+    void add(CudaDeviceMemoryPitched<TSimRefine, 3>& out_volume_dmp,
+             const CudaDeviceMemoryPitched<TSimRefine, 3>& volume_dmp);
 
     void compute(
           CudaDeviceMemoryPitched<TSim, 3>& volBestSim_dmp,
