@@ -68,12 +68,60 @@ void exportSimilarityVolume(const CudaHostMemoryHeap<TSim, 3>& volumeSim, const 
     sfmDataIO::Save(pointCloud, filepath, sfmDataIO::ESfMData::STRUCTURE);
 }
 
-void exportSimilarityVolume(const CudaHostMemoryHeap<TSimRefine, 3>& volumeSim, 
-                            const DepthSimMap& depthSimMapSgmUpscale,
-                            const mvsUtils::MultiViewParams& mp, 
-                            int camIndex, 
-                            const RefineParams& refineParams,
-                            const std::string& filepath)
+void exportSimilarityVolumeCross(const CudaHostMemoryHeap<TSim, 3>& volumeSim, const StaticVector<float>& depths,
+                                 const mvsUtils::MultiViewParams& mp, int camIndex, int scale, int step,
+                                 const std::string& filepath)
+{
+    sfmData::SfMData pointCloud;
+    const int xyStep = 1;
+
+    IndexT landmarkId;
+
+    const auto volDim = volumeSim.getSize();
+    const size_t spitch = volumeSim.getBytesPaddedUpToDim(1);
+    const size_t pitch = volumeSim.getBytesPaddedUpToDim(0);
+
+    ALICEVISION_LOG_DEBUG("DepthMap exportSimilarityVolume: " << volDim[0] << " x " << volDim[1] << " x " << volDim[2] << ", xyStep=" << xyStep << ".");
+
+    for(int z = 0; z < volDim[2]; ++z)
+    {
+        for(int y = 0; y < volDim[1]; y += xyStep)
+        {
+            const bool yCenter = (y >= volDim[1]/2) && ((y-1)< volDim[1]/2);
+            const int xIdxStart = (yCenter ? 0 : (volDim[0] / 2));
+            const int xIdxStop = (yCenter ? volDim[0] : (xIdxStart + 1));
+
+            for(int x = xIdxStart; x < xIdxStop; x += xyStep)
+            {
+                const double planeDepth = depths[z];
+                const Point3d planen = (mp.iRArr[camIndex] * Point3d(0.0f, 0.0f, 1.0f)).normalize();
+                const Point3d planep = mp.CArr[camIndex] + planen * planeDepth;
+                const Point3d v = (mp.iCamArr[camIndex] * Point2d(x * scale * step, y * scale * step)).normalize();
+                const Point3d p = linePlaneIntersect(mp.CArr[camIndex], v, planep, planen);
+
+                const float maxValue = 255.f;
+                float simValue = *get3DBufferAt_h<TSim>(volumeSim.getBuffer(), spitch, pitch, x, y, z);
+                if(simValue > maxValue)
+                    continue;
+                const rgb c = getRGBFromJetColorMap(simValue / maxValue);
+                pointCloud.getLandmarks()[landmarkId] =
+                    sfmData::Landmark(Vec3(p.x, p.y, p.z), feature::EImageDescriberType::UNKNOWN,
+                                      sfmData::Observations(), image::RGBColor(c.r, c.g, c.b));
+
+                ++landmarkId;
+            }
+        }
+    }
+
+    sfmDataIO::Save(pointCloud, filepath, sfmDataIO::ESfMData::STRUCTURE);
+}
+
+void exportSimilarityVolumeCross(const CudaHostMemoryHeap<TSimRefine, 3>& volumeSim, 
+                                 const DepthSimMap& depthSimMapSgmUpscale,
+                                 const mvsUtils::MultiViewParams& mp, 
+                                 int camIndex, 
+                                 const RefineParams& refineParams,
+                                 const std::string& filepath)
 {
     sfmData::SfMData pointCloud;
 
@@ -81,7 +129,7 @@ void exportSimilarityVolume(const CudaHostMemoryHeap<TSimRefine, 3>& volumeSim,
     const size_t spitch = volumeSim.getBytesPaddedUpToDim(1);
     const size_t pitch = volumeSim.getBytesPaddedUpToDim(0);
 
-    const float maxValue = 255.f;//80.0f;
+    const float maxValue = 5.f;//80.0f;
     const int xyStep = 1; //10;
     const int width = depthSimMapSgmUpscale.getWidth();
 
@@ -89,11 +137,13 @@ void exportSimilarityVolume(const CudaHostMemoryHeap<TSimRefine, 3>& volumeSim,
 
     IndexT landmarkId = 0;
 
-    //for(int y = 0; y < volDim[1]; y += xyStep)
-    const int y = 1500;
+    for(int y = 0; y < volDim[1]; y += xyStep)
     {
-        //for(int x = 0; x < volDim[0]; x += xyStep)
-      for(int x = 0; x < 900; x += xyStep)
+        const bool yCenter = ((y*2) == volDim[1]);
+        const int xIdxStart = (yCenter ? 0 : (volDim[0] / 2));
+        const int xIdxStop = (yCenter ? volDim[0] : (xIdxStart + 1));
+
+        for(int x = xIdxStart; x < xIdxStop; x += xyStep)
         {
             const float downscaleX = float(x * refineParams.scale * refineParams.stepXY);
             const float downscaleY = float(y * refineParams.scale * refineParams.stepXY);

@@ -263,7 +263,7 @@ void Refine::refineAndFuseDepthSimMapVolume(const DepthSimMap& depthSimMapSgmUps
         const std::string filepathPrefix = _mp.getDepthMapsFolder() + std::to_string(viewId);
         CudaHostMemoryHeap<TSimRefine, 3> volumeSim_h(volumeRefineSim_dmp.getSize());
         volumeSim_h.copyFrom(volumeRefineSim_dmp);
-        exportSimilarityVolume(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_vol_afterRefine.abc");
+        exportSimilarityVolumeCross(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_volCross_afterRefine.abc");
         exportSimilaritySamplesCSV(volumeSim_h, _rc, "afterRefine", filepathPrefix + "_9p.csv");
         volumeSim_h.deallocate();
     }
@@ -287,7 +287,7 @@ void Refine::refineAndFuseDepthSimMapVolume(const DepthSimMap& depthSimMapSgmUps
             const std::string filepathPrefix = _mp.getDepthMapsFolder() + std::to_string(viewId);
             CudaHostMemoryHeap<TSimRefine, 3> volumeSim_h(volumeRefineSim_dmp.getSize());
             volumeSim_h.copyFrom(volumeRefineSim_dmp);
-            exportSimilarityVolume(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_vol_afterRefineOpt.abc");
+            exportSimilarityVolumeCross(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_volCross_afterRefineOpt.abc");
             exportSimilaritySamplesCSV(volumeSim_h, _rc, "afterRefineOpt", filepathPrefix + "_9p.csv");
             volumeSim_h.deallocate();
         }
@@ -304,7 +304,7 @@ void Refine::refineAndFuseDepthSimMapVolume(const DepthSimMap& depthSimMapSgmUps
             const std::string filepathPrefix = _mp.getDepthMapsFolder() + std::to_string(viewId);
             CudaHostMemoryHeap<TSimRefine, 3> volumeSim_h(volumeRefineSim_dmp.getSize());
             volumeSim_h.copyFrom(volumeRefineSim_dmp);
-            exportSimilarityVolume(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_vol_afterXYZSmoothing.abc");
+            exportSimilarityVolumeCross(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_volCross_afterXYZSmoothing.abc");
             exportSimilaritySamplesCSV(volumeSim_h, _rc, "afterXYZSmoothing", filepathPrefix + "_9p.csv");
             volumeSim_h.deallocate();
         }
@@ -321,7 +321,7 @@ void Refine::refineAndFuseDepthSimMapVolume(const DepthSimMap& depthSimMapSgmUps
             const std::string filepathPrefix = _mp.getDepthMapsFolder() + std::to_string(viewId);
             CudaHostMemoryHeap<TSimRefine, 3> volumeSim_h(volumeRefineSim_dmp.getSize());
             volumeSim_h.copyFrom(volumeRefineSim_dmp);
-            exportSimilarityVolume(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_vol_afterZSmoothing.abc");
+            exportSimilarityVolumeCross(volumeSim_h, depthSimMapSgmUpscale, _mp, _rc, _refineParams, filepathPrefix + "_volCross_afterZSmoothing.abc");
             exportSimilaritySamplesCSV(volumeSim_h, _rc, "afterZSmoothing", filepathPrefix + "_9p.csv");
             volumeSim_h.deallocate();
         }

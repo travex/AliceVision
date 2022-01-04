@@ -120,6 +120,7 @@ bool Sgm::sgmRc()
         volumeSecBestSim_h.copyFrom(volumeFilteredSim_dmp);
 
         exportSimilarityVolume(volumeSecBestSim_h, _depths, _mp, _rc, _sgmParams.scale, _sgmParams.stepXY, _mp.getDepthMapsFolder() + std::to_string(viewId) + "_vol_afterFiltering.abc");
+        exportSimilarityVolumeCross(volumeSecBestSim_h, _depths, _mp, _rc, _sgmParams.scale, _sgmParams.stepXY, _mp.getDepthMapsFolder() + std::to_string(viewId) + "_volCross_afterFiltering.abc");
         exportSimilaritySamplesCSV(volumeSecBestSim_h, _depths, _rc, _sgmParams.scale, _sgmParams.stepXY, "afterFiltering", _mp.getDepthMapsFolder() + std::to_string(viewId) + "_9p.csv");
     }
 
