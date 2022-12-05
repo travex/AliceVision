@@ -24,7 +24,7 @@
 #include <set>
 #include <iterator>
 #include <iomanip>
-
+#include <fstream>
 // These constants define the current software version.
 // They must be updated when the command line is changed.
 #define ALICEVISION_SOFTWARE_VERSION_MAJOR 2
@@ -183,7 +183,9 @@ bool prepareDenseScene(const SfMData& sfmData,
 
       if(saveMatricesFiles)
       {
+        
         std::ofstream fileP((fs::path(outFolder) / (baseFilename + "_P.txt")).string());
+        
         fileP << std::setprecision(10)
              << P(0, 0) << " " << P(0, 1) << " " << P(0, 2) << " " << P(0, 3) << "\n"
              << P(1, 0) << " " << P(1, 1) << " " << P(1, 2) << " " << P(1, 3) << "\n"
