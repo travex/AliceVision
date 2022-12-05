@@ -36,6 +36,7 @@
 #include <sstream>
 #include <fstream>
 
+
 // These constants define the current software version.
 // They must be updated when the command line is changed.
 #define ALICEVISION_SOFTWARE_VERSION_MAJOR 0
@@ -48,7 +49,6 @@ namespace fs = boost::filesystem;
 
 int aliceVision_main(int argc, char** argv)
 {
-    std::string verboseLevel = system::EVerboseLevel_enumToString(system::Logger::getDefaultVerboseLevel());
     std::string sfmInputDataFilename;
     std::string outputFolder;
     int nbBrackets = 0;
@@ -60,8 +60,6 @@ int aliceVision_main(int argc, char** argv)
     int rangeSize = 1;
 
     // Command line parameters
-    po::options_description allParams("Extract stable samples from multiple LDR images with different bracketing.\n"
-                                      "AliceVision LdrToHdrSampling");
 
     po::options_description requiredParams("Required parameters");
     requiredParams.add_options()
@@ -89,42 +87,20 @@ int aliceVision_main(int argc, char** argv)
         ("rangeSize", po::value<int>(&rangeSize)->default_value(rangeSize),
           "Range size.");
 
-    po::options_description logParams("Log parameters");
-    logParams.add_options()
-        ("verboseLevel,v", po::value<std::string>(&verboseLevel)->default_value(verboseLevel),
-         "verbosity level (fatal, error, warning, info, debug, trace).");
-
-    allParams.add(requiredParams).add(optionalParams).add(logParams);
-
-    po::variables_map vm;
-    try
+    CmdLine cmdline("Extract stable samples from multiple LDR images with different bracketing.\n"
+                    "AliceVision LdrToHdrSampling");
+                  
+    cmdline.add(requiredParams);
+    cmdline.add(optionalParams);
+    if (!cmdline.execute(argc, argv))
     {
-        po::store(po::parse_command_line(argc, argv, allParams), vm);
-
-        if(vm.count("help") || (argc == 1))
-        {
-            ALICEVISION_COUT(allParams);
-            return EXIT_SUCCESS;
-        }
-        po::notify(vm);
-    }
-    catch(boost::program_options::required_option& e)
-    {
-        ALICEVISION_CERR("ERROR: " << e.what());
-        ALICEVISION_COUT("Usage:\n\n" << allParams);
-        return EXIT_FAILURE;
-    }
-    catch(boost::program_options::error& e)
-    {
-        ALICEVISION_CERR("ERROR: " << e.what());
-        ALICEVISION_COUT("Usage:\n\n" << allParams);
         return EXIT_FAILURE;
     }
 
-    ALICEVISION_COUT("Program called with the following parameters:");
-    ALICEVISION_COUT(vm);
+    // set maxThreads
+    HardwareContext hwc = cmdline.getHardwareContext();
+    omp_set_num_threads(hwc.getMaxThreads());
 
-    system::Logger::get()->setLogLevel(verboseLevel);
 
     const std::size_t channelQuantization = std::pow(2, channelQuantizationPower);
 
@@ -259,8 +235,8 @@ int aliceVision_main(int argc, char** argv)
             for(const hdr::ImageSample& sample: out_samples)
             {
                 const float score = float(sample.descriptions.size()) / float(usedNbBrackets);
-                const ColorRGBf color = getColorFromJetColorMap(score);
-                selectedPixels(sample.y, sample.x) = image::RGBfColor(color.r, color.g, color.b);
+                const image::RGBfColor color = getColorFromJetColorMap(score);
+                selectedPixels(sample.y, sample.x) = image::RGBfColor(color.r(), color.g(), color.b());
             }
             oiio::ParamValueList metadata;
             metadata.push_back(oiio::ParamValue("AliceVision:nbSelectedPixels", int(selectedPixels.size())));
@@ -270,7 +246,7 @@ int aliceVision_main(int argc, char** argv)
             metadata.push_back(oiio::ParamValue("AliceVision:medianNbUsedBrackets", extract::median(acc_nbUsedBrackets)));
 
             image::writeImage((fs::path(outputFolder) / (std::to_string(groupIdx) + "_selectedPixels.png")).string(),
-                              selectedPixels, image::EImageColorSpace::AUTO, metadata);
+                              selectedPixels, image::ImageWriteOptions(), metadata);
 
         }
 

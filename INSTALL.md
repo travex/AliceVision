@@ -17,18 +17,13 @@ Getting the sources:
 git clone https://github.com/alicevision/AliceVision.git --recursive
 ```
 
-As AliceVision use some C++11 features you must have a c++11 ready compiler:
-- Visual studio >= 2015 (English language pack required for vcpkg)
-- GCC >= 4.7
-- Clang >= 3.3
-
 Dependencies
 ------------
 
 AliceVision depends on external libraries:
 
 * [Assimp >= 5.0.0](https://github.com/assimp/assimp)
-* [Boost >= 1.70.0](https://www.boost.org)
+* [Boost >= 1.74.0](https://www.boost.org)
 * [Ceres >= 1.10.0](https://github.com/ceres-solver/ceres-solver)
 * [Eigen >= 3.3.4](https://gitlab.com/libeigen/eigen)
 * [Geogram >= 1.7.5](https://gforge.inria.fr/frs/?group_id=5833)
@@ -42,10 +37,11 @@ Other optional libraries can enable specific features (check "CMake Options" for
 * CCTag (feature extraction/matching and localization on CPU or GPU)
 * Cuda >= 7.0 (feature extraction and depth map computation)
 * Magma (required for UncertaintyTE)
-* Mosek >= 5 (linear programming)
+* Mosek >= 6 (linear programming)
 * OpenCV >= 3.4.11 (feature extraction, calibration module, video IO), >= 4.5 for colorchecker (mcc)
 * OpenGV (rig calibration and localization)
 * OpenMP (enable multi-threading)
+* PCL (Point Cloud Library) >= 1.12.1 for the registration module
 * PopSift (feature extraction on GPU)
 * UncertaintyTE (Uncertainty computation)
 
@@ -63,6 +59,12 @@ Building the project using vcpkg (recommended on Windows)
 --------------------------------
 [Vcpkg](https://github.com/alicevision/vcpkg) is a tool that helps in acquiring, building, and managing C/C++ libraries.
 AliceVision's required dependencies can be built with it. Follow the [installation guide](https://github.com/alicevision/vcpkg/blob/alicevision_master/README.md#quick-start-windows) to setup vcpkg.
+
+```bash
+git clone https://github.com/alicevision/vcpkg --branch alicevision_master
+cd vcpkg
+.\bootstrap-vcpkg.bat
+```
 
 **Note**: while started as a Windows only project, vcpkg recently became cross-platform. In the scope of AliceVision, it has only been tested on Windows.
 
@@ -105,6 +107,8 @@ vcpkg install ^
           cuda ^
           tbb ^
           assimp ^
+          pcl ^
+          clp ^
           --triplet x64-windows
 ```
 
@@ -231,9 +235,6 @@ CMake Options
   Build with Alembic file format support (required version >= 1.7).
   `-DAlembic_DIR:PATH=/path/to/alembic/install/lib/cmake/Alembic/` (where AlembicConfig.cmake can be found)
   With old Alembic versions (<1.6), you need to set many variables: `ALEMBIC_ROOT`, `ALEMBIC_HDF5_ROOT`, `ALEMBIC_ILMBASE_ROOT`, `ALEMBIC_OPENEXR_ROOT`.
-
-* `ALICEVISION_USE_OPENMP` (default: `AUTO`)
-  Enable OpenMP parallelization
 
 * `ALICEVISION_USE_CUDA` (default: `ON`)
   Enable build with CUDA (for feature extraction and depth map computation)

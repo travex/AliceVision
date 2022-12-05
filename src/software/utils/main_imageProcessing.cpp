@@ -26,7 +26,7 @@
 
 // These constants define the current software version.
 // They must be updated when the command line is changed.
-#define ALICEVISION_SOFTWARE_VERSION_MAJOR 2
+#define ALICEVISION_SOFTWARE_VERSION_MAJOR 3
 #define ALICEVISION_SOFTWARE_VERSION_MINOR 0
 
 using namespace aliceVision;
@@ -293,7 +293,6 @@ void processImage(image::Image<image::RGBAfColor>& image, const ProcessingParams
         image.swap(rescaled);
     }
     
-    #if OIIO_VERSION >= (10000 * 2 + 100 * 0 + 0) // OIIO_VERSION >= 2.0.0
     if (pParams.contrast != 1.0f)
     {
         image::Image<image::RGBAfColor> filtered(image.Width(), image.Height());
@@ -303,7 +302,6 @@ void processImage(image::Image<image::RGBAfColor>& image, const ProcessingParams
 
         image.swap(filtered);
     }
-    #endif
     if (pParams.medianFilter >= 3)
     {
         image::Image<image::RGBAfColor> filtered(image.Width(), image.Height());
@@ -406,7 +404,7 @@ void processImage(image::Image<image::RGBAfColor>& image, const ProcessingParams
 }
 
 void saveImage(image::Image<image::RGBAfColor>& image, const std::string& inputPath, const std::string& outputPath,
-               const std::vector<std::string>& metadataFolders, const EImageFormat outputFormat,
+               const std::vector<std::string>& metadataFolders, const image::EImageColorSpace workingColorSpace, const EImageFormat outputFormat,
                const image::EImageColorSpace outputColorSpace, const image::EStorageDataType storageDataType)
 {
     // Read metadata path
@@ -452,10 +450,12 @@ void saveImage(image::Image<image::RGBAfColor>& image, const std::string& inputP
 
     oiio::ParamValueList metadata = image::readImageMetadata(metadataFilePath);
 
+    auto options = image::ImageWriteOptions().toColorSpace(workingColorSpace);
+
     if(isEXR)
     {
         // Select storage data type
-        metadata.push_back(oiio::ParamValue("AliceVision:storageDataType", image::EStorageDataType_enumToString(storageDataType)));
+        options.storageDataType(storageDataType);
     }
 
     // Save image
@@ -465,39 +465,34 @@ void saveImage(image::Image<image::RGBAfColor>& image, const std::string& inputP
     {
         image::Image<float> outputImage;
         image::ConvertPixelType(image, &outputImage);
-        image::writeImage(outputPath, outputImage, outputColorSpace, metadata);
+        image::writeImage(outputPath, outputImage, options, metadata);
     }
     else if(outputFormat == EImageFormat::RGB)
     {
         image::Image<image::RGBfColor> outputImage;
         image::ConvertPixelType(image, &outputImage);
-        image::writeImage(outputPath, outputImage, outputColorSpace, metadata);
+        image::writeImage(outputPath, outputImage, options, metadata);
     }
     else 
     {
         // Already in RGBAf
-        image::writeImage(outputPath, image, outputColorSpace, metadata);
+        image::writeImage(outputPath, image, options, metadata);
     }
 }
 
 int aliceVision_main(int argc, char * argv[])
 {
-    std::string verboseLevel = system::EVerboseLevel_enumToString(system::Logger::getDefaultVerboseLevel());
     std::string inputExpression;
     std::vector<std::string> inputFolders;
     std::vector<std::string> metadataFolders;
     std::string outputPath;
     EImageFormat outputFormat = EImageFormat::RGBA;
+    image::EImageColorSpace workingColorSpace = image::EImageColorSpace::LINEAR;
     image::EImageColorSpace outputColorSpace = image::EImageColorSpace::LINEAR;
     image::EStorageDataType storageDataType = image::EStorageDataType::Float;
     std::string extension;
 
     ProcessingParams pParams;
-
-    // Command line parameters
-    po::options_description allParams(
-        "Parse external information about cameras used in a panorama.\n"
-        "AliceVision PanoramaExternalInfo");
 
     po::options_description requiredParams("Required parameters");
     requiredParams.add_options()
@@ -512,7 +507,10 @@ int aliceVision_main(int argc, char * argv[])
     po::options_description optionalParams("Optional parameters");
     optionalParams.add_options()
         ("metadataFolders", po::value<std::vector<std::string>>(&metadataFolders)->multitoken(),
-        "Use images metadata from specific folder(s) instead of those specified in the input images.")
+         "Use images metadata from specific folder(s) instead of those specified in the input images.")
+
+        ("keepImageFilename", po::value<bool>(&pParams.keepImageFilename)->default_value(pParams.keepImageFilename),
+         "Use original image names instead of view names when saving.")
 
         ("reconstructedViewsOnly", po::value<bool>(&pParams.reconstructedViewsOnly)->default_value(pParams.reconstructedViewsOnly),
          "Process only recontructed views or all views.")
@@ -564,6 +562,9 @@ int aliceVision_main(int argc, char * argv[])
                                  " * A, B: parameters that have a different interpretation depending on the method chosen.\n"
                                  " * mono: If is true, a single noise value will be applied to all channels otherwise a separate noise value will be computed for each channel.")
 
+        ("workingColorSpace", po::value<image::EImageColorSpace>(&workingColorSpace)->default_value(workingColorSpace),
+         ("Working color space: " + image::EImageColorSpace_informations()).c_str())
+
         ("outputFormat", po::value<EImageFormat>(&outputFormat)->default_value(outputFormat),
          "Output image format (rgba, rgb, grayscale)")
 
@@ -577,44 +578,14 @@ int aliceVision_main(int argc, char * argv[])
          "Output image extension (like exr, or empty to keep the source file format.")
         ;
 
-
-    po::options_description logParams("Log parameters");
-    logParams.add_options()
-        ("verboseLevel,v", po::value<std::string>(&verboseLevel)->default_value(verboseLevel),
-          "verbosity level (fatal, error, warning, info, debug, trace).");
-
-    allParams.add(requiredParams).add(optionalParams).add(logParams);
-
-    po::variables_map vm;
-    try
+    CmdLine cmdline("Parse external information about cameras used in a panorama.\n"
+                    "AliceVision PanoramaExternalInfo");
+    cmdline.add(requiredParams);
+    cmdline.add(optionalParams);
+    if (!cmdline.execute(argc, argv))
     {
-        po::store(po::parse_command_line(argc, argv, allParams), vm);
-
-        if (vm.count("help") || (argc == 1))
-        {
-          ALICEVISION_COUT(allParams);
-          return EXIT_SUCCESS;
-        }
-        po::notify(vm);
-    }
-    catch(boost::program_options::required_option& e)
-    {
-        ALICEVISION_CERR("ERROR: " << e.what());
-        ALICEVISION_COUT("Usage:\n\n" << allParams);
         return EXIT_FAILURE;
     }
-    catch(boost::program_options::error& e)
-    {
-        ALICEVISION_CERR("ERROR: " << e.what());
-        ALICEVISION_COUT("Usage:\n\n" << allParams);
-        return EXIT_FAILURE;
-    }
-
-    ALICEVISION_COUT("Program called with the following parameters:");
-    ALICEVISION_COUT(vm);
-
-      // Set verbose level
-    system::Logger::get()->setLogLevel(verboseLevel);
 
     // check user choose at least one input option
     if(inputExpression.empty() && inputFolders.empty())
@@ -702,15 +673,15 @@ int aliceVision_main(int argc, char * argv[])
             sfmData::View& view = sfmData.getView(viewId);
 
             const fs::path fsPath = viewPath;
+            const std::string fileName = fsPath.stem().string();
             const std::string fileExt = fsPath.extension().string();
             const std::string outputExt = extension.empty() ? fileExt : (std::string(".") + extension);
-            const std::string outputfilePath = (fs::path(outputPath) / (std::to_string(viewId) + outputExt)).generic_string();
+            const std::string outputfilePath = (fs::path(outputPath) / ((pParams.keepImageFilename ? fileName : std::to_string(viewId)) + outputExt)).generic_string();
 
             ALICEVISION_LOG_INFO(++i << "/" << size << " - Process view '" << viewId << "'.");
 
-
             image::ImageReadOptions options;
-            options.outputColorSpace = image::EImageColorSpace::LINEAR;
+            options.workingColorSpace = workingColorSpace;
             options.applyWhiteBalance = view.getApplyWhiteBalance();
 
             // Read original image
@@ -735,7 +706,7 @@ int aliceVision_main(int argc, char * argv[])
             processImage(image, pParams);
 
             // Save the image
-            saveImage(image, viewPath, outputfilePath, metadataFolders, outputFormat, outputColorSpace, storageDataType);
+            saveImage(image, viewPath, outputfilePath, metadataFolders, workingColorSpace, outputFormat, outputColorSpace, storageDataType);
 
             // Update view for this modification
             view.setImagePath(outputfilePath);
@@ -812,7 +783,7 @@ int aliceVision_main(int argc, char * argv[])
         }
 
         int i = 0;
-        for(const std::string& inputFilePath : filesStrPaths)
+        for (const std::string& inputFilePath : filesStrPaths)
         {
             const fs::path path = fs::path(inputFilePath);
             const std::string filename = path.stem().string();
@@ -824,13 +795,13 @@ int aliceVision_main(int argc, char * argv[])
 
             // Read original image
             image::Image<image::RGBAfColor> image;
-            image::readImage(inputFilePath, image, image::EImageColorSpace::LINEAR);
+            image::readImage(inputFilePath, image, workingColorSpace);
 
             // Image processing
             processImage(image, pParams);
 
             // Save the image
-            saveImage(image, inputFilePath, outputFilePath, metadataFolders, outputFormat, outputColorSpace, storageDataType);
+            saveImage(image, inputFilePath, outputFilePath, metadataFolders, workingColorSpace, outputFormat, outputColorSpace, storageDataType);
         }
     }
 

@@ -343,6 +343,7 @@ void detectColorChecker(
     ImageOptions& imgOpt,
     CCheckerDetectionSettings &settings)
 {
+#if ALICEVISION_IS_DEFINED(ALICEVISION_HAVE_OPENCV)
     const std::string outputFolder = fs::path(settings.outputData).parent_path().string() + "/";
     const std::string imgSrcPath = imgOpt.imgFsPath.string();
     const std::string imgSrcStem = imgOpt.imgFsPath.stem().string();
@@ -394,23 +395,23 @@ void detectColorChecker(
                 cv::imwrite(masksFolder + imgDestStem + counterStr + "_" + std::to_string(i) + ".jpg", ccq._cellMasks[i]);
         }
     }
+#else
+    throw std::invalid_argument("Unsupported mode! If you intended to use a color checker, please add OpenCV >=4.5 support.");
+#endif
+
+
 }
 
 
 int aliceVision_main(int argc, char** argv)
 {
     // command-line parameters
-    std::string verboseLevel = system::EVerboseLevel_enumToString(system::Logger::getDefaultVerboseLevel());
     std::string inputExpression;
     std::string outputData;
 
     // user optional parameters
     bool debug = false;
     unsigned int maxCountByImage = 1;
-
-    po::options_description allParams(
-        "This program is used to perform Macbeth color checker chart detection.\n"
-        "AliceVision colorCheckerDetection");
 
     po::options_description inputParams("Required parameters");
     inputParams.add_options()
@@ -426,43 +427,14 @@ int aliceVision_main(int argc, char** argv)
         ("maxCount", po::value<unsigned int>(&maxCountByImage),
          "Maximum color charts count to detect in a single image.");
 
-    po::options_description logParams("Log parameters");
-    logParams.add_options()
-        ("verboseLevel,v", po::value<std::string>(&verboseLevel)->default_value(verboseLevel),
-         "verbosity level (fatal, error, warning, info, debug, trace).");
-
-    allParams.add(inputParams).add(optionalParams).add(logParams);
-
-    po::variables_map vm;
-    try
+    CmdLine cmdline("This program is used to perform Macbeth color checker chart detection.\n"
+                    "AliceVision colorCheckerDetection");
+    cmdline.add(inputParams);
+    cmdline.add(optionalParams);
+    if (!cmdline.execute(argc, argv))
     {
-        po::store(po::parse_command_line(argc, argv, allParams), vm);
-
-        if(vm.count("help") || (argc == 1))
-        {
-            ALICEVISION_COUT(allParams);
-            return EXIT_SUCCESS;
-        }
-        po::notify(vm);
-    }
-    catch(boost::program_options::required_option& e)
-    {
-        ALICEVISION_CERR("ERROR: " << e.what());
-        ALICEVISION_COUT("Usage:\n\n" << allParams);
         return EXIT_FAILURE;
     }
-    catch(boost::program_options::error& e)
-    {
-        ALICEVISION_CERR("ERROR: " << e.what());
-        ALICEVISION_COUT("Usage:\n\n" << allParams);
-        return EXIT_FAILURE;
-    }
-
-    ALICEVISION_COUT("Program called with the following parameters:");
-    ALICEVISION_COUT(vm);
-
-    // set verbose level
-    system::Logger::get()->setLogLevel(verboseLevel);
 
     CCheckerDetectionSettings settings;
     settings.typechart = cv::mcc::TYPECHART::MCC24;
@@ -498,7 +470,7 @@ int aliceVision_main(int argc, char** argv)
                 std::to_string(view.getViewId()),
                 view.getMetadataBodySerialNumber(),
                 view.getMetadataLensSerialNumber() };
-            imgOpt.readOptions.outputColorSpace = image::EImageColorSpace::SRGB;
+            imgOpt.readOptions.workingColorSpace = image::EImageColorSpace::SRGB;
             imgOpt.readOptions.applyWhiteBalance = view.getApplyWhiteBalance();
             detectColorChecker(detectedCCheckers, imgOpt, settings);
         }
@@ -546,7 +518,7 @@ int aliceVision_main(int argc, char** argv)
             ALICEVISION_LOG_INFO(++counter << "/" << size << " - Process image at: '" << imgSrcPath << "'.");
             ImageOptions imgOpt;
             imgOpt.imgFsPath = imgSrcPath;
-            imgOpt.readOptions.outputColorSpace = image::EImageColorSpace::SRGB;
+            imgOpt.readOptions.workingColorSpace = image::EImageColorSpace::SRGB;
             detectColorChecker(detectedCCheckers, imgOpt, settings);
         }
 
